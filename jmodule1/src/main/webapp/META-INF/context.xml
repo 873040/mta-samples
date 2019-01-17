@@ -1,0 +1,10 @@
+<?xml version='1.0' encoding='utf-8'?>
+
+<Context>
+ <Resource name="jdbc/hanadb"
+    auth="Container"
+    type="javax.sql.DataSource"
+    description="MTA Sample1 HANA database"
+    factory="com.sap.xs.jdbc.datasource.tomcat.TomcatDataSourceFactory"
+    service="hana-schema-mta-sample1"/>
+</Context>

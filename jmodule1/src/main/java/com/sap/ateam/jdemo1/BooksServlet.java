@@ -1,14 +1,16 @@
 package com.sap.ateam.jdemo1;
 
 import java.io.IOException;
+import java.io.PrintWriter;
 import java.sql.Connection;
+import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Statement;
+import java.util.UUID;
 
 import javax.naming.Context;
 import javax.naming.InitialContext;
-import javax.naming.NamingException;
 import javax.servlet.ServletException;
 import javax.servlet.annotation.WebServlet;
 import javax.servlet.http.HttpServlet;
@@ -30,69 +32,96 @@ public class BooksServlet extends HttpServlet {
 	 * @see HttpServlet#doGet(HttpServletRequest request, HttpServletResponse response)
 	 */
 	protected void doGet(HttpServletRequest request, HttpServletResponse response) {
-		try {
-			initConnection();
-			listBooks(response);
-		} catch (Exception e) {
-			logger.error("doGet ran into an exception.", e);
-		}
+		listBooks(response);
 	}
 
-	private void listBooks(HttpServletResponse response) throws IOException, SQLException {
+	private void listBooks(HttpServletResponse response) {
 		Statement stmt = null;
-		String query = "SELECT id, title, author FROM books";
+		String query = "SELECT id, title, author FROM books ORDER BY id";
+		Connection conn = getConnection();
+		PrintWriter pw = null;
 
-		response.getWriter().append("<html><body><table border=2>").println();
-		response.getWriter().append("<tr><td>ID</td><td>Title</td><td>Author</td></tr>").println();
-		
 		try {
+			response.setContentType("text/html");
+			pw = response.getWriter();
+			pw.append("<html><body>").println();
+			pw.append("<table border=2>").println();
+			pw.append("<tr><td>ID</td><td>Title</td><td>Author</td></tr>").println();
+		
 			stmt = conn.createStatement();
 			ResultSet rs = stmt.executeQuery(query);
 			while (rs.next()) {
 	            int id = rs.getInt("id");
 	            String title = rs.getString("title");
 	            String author = rs.getString("author");
-				response.getWriter().append("<tr><td>" + id + "</td>").println();
-				response.getWriter().append("<td>" + title + "</td>").println();
-				response.getWriter().append("<td>" + author + "</td></tr>").println();
+				pw.append("<tr><td>" + id + "</td>").println();
+				pw.append("<td>" + title + "</td>").println();
+				pw.append("<td>" + author + "</td></tr>").println();
 			}
+			
+			pw.append("</table><p></p><p></p>").println();
+			pw.append("<code>Served by node id " + uuid + "</code>").println();
+			
 		} catch (SQLException e ) {
-			logger.error("getData ran into an exception.", e);
+			logger.error("listBooks ran into an exception.", e);
+		} catch (IOException ioe) {
+			logger.error("listBooks ran into an exception.", ioe);
 		} finally {
-			if (stmt != null) { stmt.close(); }
-			response.getWriter().append("</table></body></html>").println();
+			if (stmt != null) { try { stmt.close(); } catch (SQLException e) { } }
+			pw.append("</body></html>").println();
 		}
 	}
 
-	private void initConnection() throws NamingException, SQLException {
-		if (conn == null || !conn.isValid(1000)) {
+	private Connection getConnection() {
+		Connection conn = null;
+
+		try {
 			Context ctx = new InitialContext();
-		
 			DataSource ds = (DataSource) ctx.lookup("java:comp/env/jdbc/hanadb");
 			if (ds == null) {
 				logger.error("Error resolving DataSource context.");
-				return;
-			} else {
-				logger.info("Successfully got DataSource.");
+				return null;
 			}
-	
+			
 			conn = ds.getConnection();
-			if (conn.isValid(1000)) {
-				logger.info("Connection is valid!");
-			} else {
+			if (!conn.isValid(1000)) {
 				logger.error("Connection is invalid.");
-				return;
+				return null;
 			}
+		} catch (Exception e) {
+			logger.error("Error getting connection.", e);
 		}
+		
+		return conn;
 	}
 
 	/**
 	 * @see HttpServlet#doPost(HttpServletRequest request, HttpServletResponse response)
 	 */
 	protected void doPost(HttpServletRequest request, HttpServletResponse response) throws ServletException, IOException {
-		doGet(request, response);
+		addBook(request, response);
 	}
 	
+	private void addBook(HttpServletRequest request, HttpServletResponse response) {
+		PreparedStatement stmt = null;
+		String title = request.getParameter("title");
+		String author = request.getParameter("author");
+		String query = "INSERT INTO BOOKS(title, author) VALUES(?, ?)";
+		Connection conn = getConnection();
+		
+		try {
+			stmt = conn.prepareStatement(query);
+			stmt.setString(1, title);
+			stmt.setString(2, author);
+			stmt.execute();
+		} catch (SQLException e ) {
+			logger.error("addBook ran into an exception.", e);
+		} finally {
+			if (stmt != null) { try { stmt.close(); } catch (SQLException e) { } }
+		}
+	}
+
+	@SuppressWarnings("unused")
 	private String getData(Connection con) throws SQLException {
 		Statement stmt = null;
 		String name = null;
@@ -111,7 +140,6 @@ public class BooksServlet extends HttpServlet {
         return name;
 	}
 
-
+	private static String uuid = UUID.randomUUID().toString().substring(0, 6);
 	private Logger logger = LoggerFactory.getLogger(BooksServlet.class);
-	private Connection conn = null;
 }

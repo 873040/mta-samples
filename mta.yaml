@@ -1,0 +1,20 @@
+ID: mta-sample1
+_schema-version: '2.0'
+version: 1.0.0
+
+modules:
+ - name: jmodule1
+   type: java
+   path: jmodule1
+   parameters:
+      disk-quota: 256M
+      memory: 512M
+   build-parameters:
+      builder: maven
+   requires:
+     - name: hana-schema-mta-sample1
+
+resources:
+ - name: hana-schema-mta-sample1
+   type: org.cloudfoundry.existing-service
+   
